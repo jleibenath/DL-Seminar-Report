@@ -1,0 +1,156 @@
+\documentclass{article}
+\usepackage{graphicx} % Required for inserting images
+\usepackage{amsmath}
+\usepackage{mathtools}
+\usepackage[
+  backend=biber
+]{biblatex}
+\usepackage[a4paper,margin=3cm]{geometry}
+
+\addbibresource{references.bib}
+
+\title{DL Seminar Report}
+\author{Jason Leibenath}
+\date{November 2025}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+    This is where the Abstract will be.
+\end{abstract}
+
+\section{Introduction}
+The multilayer perceptron (MLP) or feedforward network is one of the most well known and used types of neural network. It is at the heart of many other network architectures; therefore, it is important to have a good understanding of it before diving deeper into more complex deep learning methods. In this report, we introduce the multilayer perceptron and the backpropagation algorithm. In addition, we will discuss aspects of implementation and use a neural network to classify gene sequences on the basis of their antimicrobial resistance to a certain antibiotic. 
+
+\section{Related Work}
+
+\section{The Network Architecture}
+Being a supervised learning method, the MLP takes a dataset $D = {(x_{k}, y_{k})}_{k=1}^{K}$ with $x_{k}$ being the $k$-th data point and $y_{k}$ the corresponding label. The goal is to find a function $f(x)$, that minimizes a given loss function $L(f(x), y)$. The feedforward network consists of several layers of interconnected nodes. The first layer is called the input layer and takes in a data point $x_{k}$ as input. To work with a given dataset, it is necessary to convert the data points into numerical vectors. The effectiveness of a network greatly depends on finding a good embedding strategy; more on that in the implementation section. The input layer has one node for each dimension of the vector space of the data point. After that, there are several hidden layers, followed by the output layer. Each node in the hidden layers and the output layer is connected to all nodes of the anterior layer with a weight associated with every connection. Processing an input a signal is passed through the layers, with the $j$-th node of a given layer taking the output $\vec{x}$ of the previous layer as input and outputting $z_{j}$, the sum of those signals $x_{i}, i\in\{1,...,n\}$ from the $n$ nodes of the previous layer multiplied with their respective weights $w_{ij}$ plus a bias $b_j$
+\[
+z_{j} = \sum_{i=1}^n x_{i}\:w_{ji} \; + \; b_j
+\]
+Note how, on the level of a whole layer, this operation is essentially a matrix multiplication and vector addition with an input vector $\vec{x}$, weight matrix $W$, bias vector $\vec{b}$, and  output vector $\vec{z}$
+\[
+W = 
+\begin{bmatrix}
+w_{11} & \dots & w_{1n} \\
+\vdots & & \vdots \\
+w_{m1} & \dots & w_{mn}
+\end{bmatrix}\:, \qquad
+\vec{x}\; = 
+\begin{pmatrix}
+x_1 \\
+\vdots \\
+x_n
+\end{pmatrix}\:, \qquad
+\vec{b} = 
+\begin{pmatrix}
+b_1 \\
+\vdots \\
+b_m
+\end{pmatrix}
+\:, \qquad
+\vec{z} \coloneqq W\,\vec{x} \; + \; \vec{b}
+\]
+However, with this alone, multiple layers would not grant any advantage over a single layer, as two layers could always be collapsed into a single one like this:
+\[
+\vec{b} \; \coloneqq \; \vec{b}_2 + W_2 \vec{b}_1 \; ; \qquad 
+W \; \coloneqq \; W_2 \, W_1
+\]
+\[
+\vec{z} \quad = \quad \vec{b}_2 + W_2(\vec{b}_1 + W_1 \vec{x}) \quad = \quad \vec{b}_2 + W_2 \vec{b}_1 + W_2 W_1\vec{x} \quad = \quad \vec{b} + W \vec{x} 
+\]
+This is because we only apply linear functions (and add something in the end) and a linear function applied to a linear function results in another linear function. So to make the network able to compute something interesting, it is necessary to apply a non-linear activation function after every layer. Commonly used activation functions are the sigmoid, given by 
+\[
+f(z) = \frac{1}{1 + \exp(-z)}
+\]
+and the ReLU (Rectified Linear Unit): 
+\[
+f(z) = \max(0, z)
+\]
+To interpret the output of the network, we have to compare the output vector $\vec{z}$ to the label $\vec{y}_k$. For a classification problem, where the data points $\vec{x}_k$ are split into $n$ classes, the label is typically a one-hot-vector of size $n$. That means if the $k$-th data point belongs to the $i$-th of the $n$ classes, its label $\vec{y}_k$ would consist of a $1$ at the $i$-th coordinate and $0$s in all other coordinates. To be able to match that, the output layer should have $n$ nodes, one for every class. In order to compare the network output with the label, it can be transformed into a probability distribution, using the softmax function as activation for the output layer:
+\[
+softmax(z_i) = \frac{e^{z_i}}{\sum_{j=1}^n e^{z_j}}
+\]
+$softmax(z_i)$ returns the networks confidence that the data point belongs to the $i$-th class. That can be interpreted as a probability, because all values are between 0 and 1, and they add up to 1.
+To exactly measure how well the network predicted the label $y_k$ for a given input $x_k$, a loss function is applied after a forward pass, to compare the output (in this case the probability distribution) with the label. In combination with the softmax function, the loss function of choice is usually the cross-entropy-loss, because it is very easy to calculate its derivative. More on that in the Backpropagation chapter. The cross-entropy-loss function is defined as follows:
+\[
+L(\vec{s}, \vec{y}) = - \sum_{i=1}^n y_i \: log(s_i)
+\]
+$\vec{s}$ being the output of the softmax function and $\vec{y}$ being the label. Since $\vec{y}$ is a one-hot-vector, all its coordinates and therefore all parts of the sum except the $i$-th one are equal to $0$, so the whole function can be simplified to
+\[
+L(\vec{s}, \vec{y}) = - log(s_i)
+\]
+with $i \in \{1, \dots, n\}$, such that $ y_i = 1$ .
+
+\section{The Backpropagation Algorithm}
+So far, the network has been able to produce a prediction for a data point and be evaluated based on its performance. Now we need a way to make the network learn. When we take a step back, any state of the parameters of a network is a function that turns data points into predictions. For a fixed $k$, the loss function maps these network functions to a score. Since a low loss implies a good prediction, the goal is to find a set of parameters that minimizes the loss function for any given $k$. Because of the huge number of parameters in these networks, it would be infeasible to compute the global minimum, so gradient decent is used to find a local minimum. To do that, it is necessary to compute the partial derivatives of $L$ with respect to all the weights and biases of the network, which is exactly what the backpropagation algorithm does.
+
+Because the derivatives of the parameters close to the output layer are contained in those of the other layers, we start out at the very end. First, we calculate the derivative with respect to the output of the network $\vec{z}$:
+\[
+ \frac{dL}{dz_j} = \frac{ds_i}{dz_j} \frac{dL}{ds_i} \;,\qquad \frac{dL}{s_i} = -\frac{1}{s_i}
+\]
+In case $i = j$:
+\[
+s_i = \frac{e^{z_i}}{\sum_k e^{z_k}} = \frac{e^{z_i}}{c + e^{z_i}} \;, \quad
+c \coloneqq \sum_{k\neq i} e^{z_k}
+\]
+\[
+\frac{ds_i}{dz_i} = \frac{c\cdot e^{z_i}}{(c + e^{z_i})^2} = \frac{e^{z_i}}{\sum_k e^{z_k}} \frac{1-e^{z_i}}{\sum_k e^{z_k}} = s_i(1-s_i)
+\]
+\[
+\frac{dL}{dz_i} = -\frac{1}{s_i}s_i(1-s_i) = s_i - 1
+\]
+In case $i \neq j$:
+\[
+s_i = \frac{e^{z_i}}{c + e^{z_j}} \;, \quad c\coloneqq \sum_{k\neq j} e^{z_k}
+\]
+\[
+\frac{ds_i}{dz_j} = -\frac{e^{z_i} \cdot e^{z_j}}{(\sum_k e^{z_k})^2} = -s_i\, s_j
+\]
+\[
+\frac{dL}{z_j} = -\frac{1}{s_i}\cdot (-s_i s_j) = s_j
+\]
+In vector form, the gradients for $\vec{z}$ are simply: $\nabla_{\vec{z}}L = \vec{s}-\vec{y}$. Now, to determine the gradients for the weights and biases of the output layer, we only need to look at how they affect $\vec{z}$, because we already know its gradients: \[
+\frac{dL}{db_j} = \frac{dz_j}{db_j}\frac{dL}{dz_j} \;, \qquad
+\frac{dL}{dw_{jk}} = \frac{dz_j}{w_{jk}}\frac{dL}{dz_j}
+\]
+Let $\vec{a}$ be the activation values of the previous layer from the forward pass and $W$ and $\vec{b}$ be the parameters for the current layer, then the output $\vec{z}$ is defined as:
+\[
+z_j = \sum_{k=1}^n a_kw_{jk} \; + \; bj
+\]
+So the gradients for the biases and weights are:
+\[
+\frac{dz_j}{db_j} = 1 \implies \frac{dL}{db_j} = \frac{dL}{dz_j}\;,\qquad \frac{dz_j}{w_{jk}} = a_k \implies \frac{dL}{dw_{jk}} = a_k\frac{dL}{dz_j}
+\]
+For subsequent layers, a pattern emerges. Since the backpropagation algorithm does a backward pass, the derivative of $L$ with respect to the output $\vec{z}$ of the next layer will have already been calculated. So all, that is left to do is, to figure out the derivative of the parameters of a layer with respect to the output of the next layer. Both weights and biases of a layer only affect the $z$-value of their neuron directly, so the derivative of the $z$-values of the next layer, and in extension of the Loss function with respect to the $z$-values of the current layer is considered first. This is also the part that needs to be saved for the other layers. Let $\vec{z}^1, \, \vec{a}^1$ be the output and activation values for the current layer and $\vec{z}^2$ the output values of the next layer. Then the derivative is:
+\[
+\frac{dL}{dz_j^1} = \frac{d\vec{z}^2}{dz_j^1} \frac{dL}{d\vec{z}_j^2} = \frac{da_j^1}{dz_j^1} \sum_k^n \frac{dz_k^2}{da_j^1} \frac{dL}{dz_k^2}
+\]
+With the ReLU as an example activation function, its derivative is just
+\[
+\frac{da_j^1}{dz_j^1} = 
+\begin{cases}
+0, & \text{if } z_j^1 < 0, \\
+1, & \text{if } z_j^1 \ge 0.
+\end{cases}
+\]
+Even though the derivative is technically not defined at $z_j^1=0$. $a_j^1$ contributes to $z_k^2$ in being multiplied with $w_{kj}^2$. Therefor:
+\[
+\frac{dz_k^2}{da_j^1} = w_{kj}^2
+\]
+What remains is, to determine the derivatives of the parameters of the current layer to the output. But those are, as previously calculated, $1$ for the biases and $a_k^0$ for the weight $w_{jk}^1$ and output $z_j^1$.
+
+\section{Implementation}
+
+\section{Results}
+
+\section{Discussion}
+
+\section{Conclusion}
+
+\printbibliography
+
+\end{document}

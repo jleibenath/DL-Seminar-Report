@@ -79,7 +79,7 @@ To exactly measure how well the network predicted the label $y_k$ for a given in
 \[
 L(\vec{s}, \vec{y}) = - \sum_{i=1}^n y_i \: log(s_i)
 \]
-$\vec{s}$ being the output of the softmax function and $\vec{y}$ being the label. Since $\vec{y}$ is a one-hot-vector, all its coordinates and therefore all parts of the sum except the $i$-th one are equal to $0$, so the whole function can be simplified to
+where $\vec{s}$ is the output of the softmax function and $\vec{y}$ being the label. Since $\vec{y}$ is a one-hot-vector, all its coordinates and therefore all parts of the sum except the $i$-th one are equal to $0$, so the whole function can be simplified to
 \[
 L(\vec{s}, \vec{y}) = - log(s_i)
 \]
@@ -88,7 +88,11 @@ with $i \in \{1, \dots, n\}$, such that $ y_i = 1$ .
 \section{The Backpropagation Algorithm}
 So far, the network has been able to produce a prediction for a data point and be evaluated based on its performance. Now we need a way to make the network learn. When we take a step back, any state of the parameters of a network is a function that turns data points into predictions. For a fixed $k$, the loss function maps these network functions to a score. Since a low loss implies a good prediction, the goal is to find a set of parameters that minimizes the loss function for any given $k$. Because of the huge number of parameters in these networks, it would be infeasible to compute the global minimum, so gradient decent is used to find a local minimum. To do that, it is necessary to compute the partial derivatives of $L$ with respect to all the weights and biases of the network, which is exactly what the backpropagation algorithm does.
 
-Because the derivatives of the parameters close to the output layer are contained in those of the other layers, we start out at the very end. First, we calculate the derivative with respect to the output of the network $\vec{z}$:
+The first step is, to initialize all parameters to small values, typically inversely proportional to the size of the network. If these values were $0$, the gradients that will be calculated would also be $0$ since there would not be any link between them and the output. 
+
+The training is done in epochs, where an epoch means, that the network has seen every data point of the training set once. To account for all training vectors equally, the gradients for each data point are stored and the parameters are only updated at the end of each epoch. It is usually faster though to either adjust the weights after each iteration, or to group several points into batches and apply the gradients after each batch. That means that the order in which the training points are presented matters.
+
+Before calculating the gradients for a vector, a forward pass is done, as explained earlier. The the output values and activation values for every node is stored because they will be used later in the process. Then we can start to calculate the gradients. Because the derivatives of the parameters close to the output layer are contained in those of the other layers, we start out at the very end and work our way backwards. This is also, why it is called backpropagation. First, we calculate the derivative of the loss $L$ with respect to the output of the network $\vec{z}$:
 \[
  \frac{dL}{dz_j} = \frac{ds_i}{dz_j} \frac{dL}{ds_i} \;,\qquad \frac{dL}{s_i} = -\frac{1}{s_i}
 \]
@@ -113,7 +117,7 @@ s_i = \frac{e^{z_i}}{c + e^{z_j}} \;, \quad c\coloneqq \sum_{k\neq j} e^{z_k}
 \[
 \frac{dL}{z_j} = -\frac{1}{s_i}\cdot (-s_i s_j) = s_j
 \]
-In vector form, the gradients for $\vec{z}$ are simply: $\nabla_{\vec{z}}L = \vec{s}-\vec{y}$. Now, to determine the gradients for the weights and biases of the output layer, we only need to look at how they affect $\vec{z}$, because we already know its gradients: \[
+In vector form, the gradients for $\vec{z}$ are simply: $\nabla_{\vec{z}}L = \vec{s}-\vec{y}$. Now, to determine the gradients for the weights and biases of the output layer, we only need to look at how they affect $\vec{z}$, because we already know its derivative: \[
 \frac{dL}{db_j} = \frac{dz_j}{db_j}\frac{dL}{dz_j} \;, \qquad
 \frac{dL}{dw_{jk}} = \frac{dz_j}{w_{jk}}\frac{dL}{dz_j}
 \]
@@ -141,7 +145,8 @@ Even though the derivative is technically not defined at $z_j^1=0$. $a_j^1$ cont
 \[
 \frac{dz_k^2}{da_j^1} = w_{kj}^2
 \]
-What remains is, to determine the derivatives of the parameters of the current layer to the output. But those are, as previously calculated, $1$ for the biases and $a_k^0$ for the weight $w_{jk}^1$ and output $z_j^1$.
+What remains is, to determine the derivatives of the parameters $b$ and $W$ of the current layer to the output. But those are, as previously calculated, $1$ for the biases and $a_k^0$ for the weight $w_{jk}^1$ and output $z_j^1$. When all gradients are calculated, the penultimate step is to multiply them by the learn rate $\alpha$, which is usually a small number but the exact value can be experimented with. It should not be too high, so the parameters converge and do not jump around too much, but it should not be too low either, so the network improves reasonably fast.
+Finally after the gradients for an entire batch are calculated, they are added up and subtracted from the parameters.
 
 \section{Implementation}
 
